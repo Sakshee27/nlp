@@ -1,0 +1,50 @@
+from tensorflow import keras 
+from keras.layers import Input,Dense,Flatten,Reshape 
+from keras import losses 
+from keras.datasets import fashion_mnist 
+import matplotlib.pyplot as plt 
+(x_tr,y_tr),(x_test,y_test)=fashion_mnist.load_data()
+
+plt.figure(figsize=(30,30)) 
+for i in range(0,32): 
+    plt.subplot(8,4,i+1) 
+    plt.subplots_adjust(hspace=0.8,wspace=0.8) 
+    plt.imshow(x_tr[i]) 
+    plt.title(f"Label: {y_tr[i]}") 
+    plt.show()
+
+input_encoder= Input(shape=(28,28)) 
+flat_layer = Flatten()(input_encoder)  
+hidden_layer1= Dense(128, activation='relu')(flat_layer) 
+hidden_layer2= Dense(64, activation='relu')(hidden_layer1) 
+latent_layer= Dense(32, activation='relu')(hidden_layer2) 
+encoder_model=keras.Model(inputs=input_encoder,outputs=latent_layer) 
+encoder_model.summary()
+
+input_decoder = Input(shape=(encoder_model.output.shape[1],)) 
+hidden_layer1 = Dense(100, activation="relu")(input_decoder) 
+hidden_layer2 = Dense(28*28, activation="relu")(hidden_layer1) 
+output_layer = Reshape((28,28))(hidden_layer2) 
+decoder_model= keras.Model(inputs=input_decoder, outputs=output_layer) 
+print(decoder_model.summary()) 
+
+autoencoder_decoder=keras.Model(inputs=encoder_model.input,outputs=decoder_model(
+encoder_model.output)) 
+autoencoder_decoder.compile(optimizer="adam", loss="mse") 
+autoencoder_decoder.fit(x_tr, x_tr,validation_data=(x_test, x_test),epochs=30)
+
+reconstructed = autoencoder_decoder.predict(x_test) 
+reconstructed.shape
+
+plt.figure(figsize=(8,4)) 
+for i in range(5):  
+    plt.subplot(2,5,i+1) 
+    plt.imshow(x_test[i]) 
+    plt.title("Original") 
+    plt.axis('off') 
+   
+    plt.subplot(2,5,i+6) 
+    plt.imshow(reconstructed[i]) 
+    plt.title("Reconstructed") 
+    plt.axis('off') 
+plt.show() 

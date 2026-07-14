@@ -1,0 +1,87 @@
+import tensorflow 
+import cv2 
+import matplotlib.pyplot as plt 
+import numpy as np 
+
+from tensorflow.keras.datasets import mnist
+(img_tr,lbl_tr),(img_test,lbl_test)=mnist.load_data()
+
+img_tr.shape 
+img_test.shape 
+img_tr[0].shape 
+lbl_tr[0]
+np.uint8(5)
+
+plt.imshow(img_tr[0]) 
+plt.title(lbl_tr[0]) 
+plt.show()
+
+plt.imshow(img_test[0]) 
+plt.title(lbl_test[0]) 
+plt.show()
+
+img_grayscale=img_tr[0] 
+plt.imshow(img_grayscale, cmap='gray') 
+plt.show()
+
+plt.figure(figsize=(15,15)) 
+for i in range (0,32): 
+    plt.subplot(8,4,i+1) 
+    plt.subplots_adjust(hspace=4.0,wspace=2.0) 
+    plt.imshow(img_tr[i]) 
+    plt.title(lbl_tr[i]) 
+    plt.show() 
+
+from tensorflow import keras
+from tensorflow.keras.layers import Input, Dense
+
+img_tr[0].shape
+input_layer=Input(shape=(784,))
+hidden_layer1=Dense(522,activation="relu")
+hidden_layer1=hidden_layer1(input_layer)
+hidden_layer2=Dense(348,activation="relu")
+hidden_layer2=hidden_layer2(hidden_layer1)
+hidden_layer3=Dense(232,activation="relu")
+hidden_layer3=hidden_layer3(hidden_layer2)
+output_layer=Dense(10,activation="softmax")
+output_layer=output_layer(hidden_layer3)
+ann=keras.Model(inputs=input_layer,outputs=output_layer)
+ann.summary()
+
+ann.compile(optimizer="adam",loss="sparse_categorical_crossentropy",metrics=["accuracy"]
+) 
+
+es=keras.callbacks.EarlyStopping(monitor="loss",verbose=3,patience=1) 
+img_tr_new=np.reshape(img_tr,(60000,784)) 
+img_test_new=np.reshape(img_test,(10000,784)) 
+ann.fit(img_tr_new,lbl_tr,validation_data=(img_test_new,lbl_test),epochs=200,callbacks=es)
+
+img = img_test_new[0].reshape(1,784) 
+p=ann.predict(img) 
+p 
+
+plist=[] 
+for i in p: 
+    plist.append(np.argmax(i)) 
+print("Predicted Digit:", plist[0]) 
+print("Actual Digit:", lbl_test[0]) 
+
+img_out=cv2.imread("/content/Prac 1 Image.png", 
+cv2.IMREAD_GRAYSCALE) 
+img_out=cv2.resize(img_out, (28, 28)) 
+print("Resized shape:", img_out.shape) 
+_, img_out = cv2.threshold(img_out,127,255, cv2.THRESH_BINARY) 
+img_out=255 - img_out
+
+# Display processed image 
+plt.imshow(img_out, cmap='gray') 
+plt.title("Processed External JPEG Image") 
+plt.axis('off') 
+plt.show()
+
+img_out_input=img_out.reshape(1, 784) 
+prediction=ann.predict(img_out_input) 
+predicted_digit=np.argmax(prediction) 
+
+print("Prediction Probabilities:\n", prediction) 
+print("Predicted Digit:", predicted_digit)

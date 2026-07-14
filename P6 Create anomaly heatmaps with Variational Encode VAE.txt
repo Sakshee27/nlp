@@ -1,0 +1,294 @@
+import os
+import cv2
+import numpy as np
+import pandas as pd
+import seaborn as sns
+import keras
+from keras.layers import Dense,Input,Conv2D,MaxPooling2D,Flatten,Reshape,Lambda,Conv2DTranspose
+from keras import ops
+
+import kagglehub
+
+# Download latest version
+path = kagglehub.dataset_download("pkdarabi/solarpanel")
+
+print("Path to dataset files:", path)
+
+path = kagglehub.dataset_download("pkdarabi/solarpanel")
+print("Path to dataset files:", path)
+
+import os
+
+print(os.listdir(path))
+
+import os
+
+print("Root contents:")
+print(os.listdir(path))
+
+# Assuming the actual dataset structure is path/ImageSet/train, path/ImageSet/test, etc.
+dataset_root = f"{path}/ImageSet"
+
+print("\nTrain folder contents:")
+train_dir = f"{dataset_root}/train"
+print(os.listdir(train_dir))
+
+print("\nTest folder contents:")
+test_dir = f"{dataset_root}/test"
+print(os.listdir(test_dir))
+
+print("\nValid folder contents:")
+valid_dir = f"{dataset_root}/valid"
+print(os.listdir(valid_dir))
+
+# Peek inside whatever the first subfolder of train is
+first_sub = os.listdir(train_dir)[0]
+print(f"\nContents of train/{first_sub}:")
+print(os.listdir(f"{train_dir}/{first_sub}")[:10])
+
+import os
+
+# path comes from kagglehub.dataset_download("pkdarabi/solarpanel") — reuse the existing variable
+dataset_root = f"{path}/ImageSet"
+
+Thermal_path = f"{dataset_root}/train/images"   # normal images -> used to train the VAE
+Thermal_path_2 = f"{dataset_root}/test/images"  # test images -> used to generate anomaly heatmaps
+
+print(len(os.listdir(Thermal_path)), "training images")
+print(len(os.listdir(Thermal_path_2)), "test images")
+print(os.listdir(Thermal_path)[:5])
+print(os.listdir(Thermal_path_2)[:5])
+
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+import tensorflow as tf
+import keras
+from keras import ops
+from keras.layers import Input, Dense, Conv2D, Conv2DTranspose, Flatten, Reshape, Lambda
+
+def show_images(folder_path, title):
+    files = os.listdir(folder_path)[:6]
+    plt.figure(figsize=(10, 5))
+    plt.suptitle(title)
+    for i, file in enumerate(files):
+        path = os.path.join(folder_path, file)
+        img = cv2.imread(path)
+        plt.subplot(2, 3, i + 1)
+        plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        plt.title(file)
+        plt.axis('off')
+    plt.show()
+ 
+show_images(Thermal_path, "Thermal Data (Normal)")
+show_images(Thermal_path_2, "Thermal Data (Anomaly/Test)")
+
+def otsu(folder_path):
+    files = os.listdir(folder_path)[:6]
+    plt.figure(figsize=(10, 5))
+    for i, file in enumerate(files):
+        path = os.path.join(folder_path, file)
+        img = cv2.imread(path)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        t, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        print(f"{file} -> Threshold: {t}")
+        plt.subplot(2, 3, i + 1)
+        plt.imshow(binary, cmap='gray')
+        plt.title(f"T={t:.2f}")
+        plt.axis('off')
+    plt.show()
+ 
+otsu(Thermal_path)
+otsu(Thermal_path_2)
+
+def plot_distributions(folder):
+    images = os.listdir(folder)[:6]
+    plt.figure(figsize=(12, 6))
+    for i, img_name in enumerate(images):
+        img = cv2.imread(os.path.join(folder, img_name), 0)
+        plt.subplot(2, 3, i + 1)
+        plt.hist(img.ravel(), bins=256)
+        plt.title(img_name)
+    plt.tight_layout()
+    plt.show()
+ 
+plot_distributions(Thermal_path)
+
+IMG_SIZE = (128, 128)
+BATCH_SIZE = 8   # bumped up from 3 -- tiny batches make VAE training noisy/unstable
+ 
+data_tr = keras.utils.image_dataset_from_directory(
+    Thermal_path,
+    batch_size=BATCH_SIZE,
+    labels=None,        # no subfolders/labels needed
+    label_mode=None,
+    color_mode='rgb',
+    image_size=IMG_SIZE,
+    shuffle=True
+)
+ 
+# Normalize to [0,1] as part of the pipeline (cleaner than doing it ad hoc later)
+normalize = lambda x: x / 255.0
+data_tr = data_tr.map(normalize)
+ 
+
+# Quick peek at a few batches
+for batch in data_tr.take(1):
+    print("Batch shape:", batch.shape)
+    plt.imshow(batch[0].numpy())
+    plt.title("Sample training image")
+    plt.axis('off')
+    plt.show()
+
+
+ 
+# ============================================================
+# STEP 5 — Encoder
+# ============================================================
+LATENT_DIM = 32
+ 
+encoder_inputs = Input(shape=(128, 128, 3))
+conv2d1 = Conv2D(32, (3, 3), strides=2, padding="same", activation="relu")(encoder_inputs)
+conv2d2 = Conv2D(64, (3, 3), strides=2, padding="same", activation="relu")(conv2d1)
+flatten_layer = Flatten()(conv2d2)
+hidden_layer = Dense(64, activation="relu")(flatten_layer)
+mean = Dense(LATENT_DIM)(hidden_layer)
+var = Dense(LATENT_DIM)(hidden_layer)
+var = ops.clip(var, -10.0, 10.0)
+ 
+z = Lambda(
+    lambda x: x[0] + ops.exp(0.5 * x[1]) * keras.random.normal(shape=ops.shape(x[0]), seed=100),
+    output_shape=(LATENT_DIM,)
+)([mean, var])
+ 
+encoder = keras.Model(inputs=encoder_inputs, outputs=[mean, var, z], name="encoder")
+encoder.summary()
+
+
+ 
+# ============================================================
+# STEP 6 — Decoder
+# ============================================================
+decoder_inputs = Input(shape=(LATENT_DIM,))
+x = Dense(32 * 32 * 64, activation='relu')(decoder_inputs)
+x = Reshape((32, 32, 64))(x)
+x = Conv2DTranspose(64, (3, 3), strides=2, padding='same', activation='relu')(x)
+x = Conv2DTranspose(32, (3, 3), strides=2, padding='same', activation='relu')(x)
+decoder_outputs = Conv2DTranspose(3, (3, 3), padding='same', activation='sigmoid')(x)
+ 
+decoder = keras.Model(decoder_inputs, decoder_outputs, name="decoder")
+decoder.summary()
+
+
+ 
+# ============================================================
+# STEP 7 — Full VAE model
+# ============================================================
+z_sample_output = encoder.output[2]
+reconstructed_img = decoder(z_sample_output)
+vae = keras.Model(inputs=encoder.input, outputs=reconstructed_img, name="vae")
+vae.summary()
+ 
+
+
+# ============================================================
+# STEP 8 — Training step and loop (now iterates over ALL batches, not just one)
+# ============================================================
+optimizer = keras.optimizers.Adam(learning_rate=0.0001, clipnorm=1.0)
+ 
+@tf.function
+def train_step(x):
+    with tf.GradientTape() as tape:
+        z_mean_out, z_log_var_out, z_sample = encoder(x, training=True)
+        reconstruction = decoder(z_sample, training=True)
+ 
+        # Reconstruction loss (MSE per pixel, averaged)
+        reconstruction_loss = tf.reduce_mean(tf.square(x - reconstruction))
+ 
+        # KL divergence: -0.5 * sum(1 + log_var - mean^2 - exp(log_var))
+        kl_loss = -0.5 * tf.reduce_mean(
+            1.0 + z_log_var_out - tf.square(z_mean_out) - tf.exp(z_log_var_out)
+        )
+ 
+        loss = reconstruction_loss + 0.001 * kl_loss
+ 
+    grads = tape.gradient(loss, vae.trainable_weights)
+    grads = [tf.where(tf.math.is_nan(g), tf.zeros_like(g), g) for g in grads]
+    optimizer.apply_gradients(zip(grads, vae.trainable_weights))
+    return loss, reconstruction_loss, kl_loss
+ 
+ 
+EPOCHS = 100
+ 
+for epoch in range(EPOCHS):
+    epoch_loss, epoch_rec, epoch_kl = [], [], []
+ 
+    for batch in data_tr:
+        loss, rec_loss, kl = train_step(batch)
+        epoch_loss.append(loss.numpy())
+        epoch_rec.append(rec_loss.numpy())
+        epoch_kl.append(kl.numpy())
+ 
+    print(
+        f"Epoch {epoch + 1}: "
+        f"Loss={np.mean(epoch_loss):.4f} | "
+        f"Recon={np.mean(epoch_rec):.4f} | "
+        f"KL={np.mean(epoch_kl):.4f}"
+    )
+
+
+ 
+# ============================================================
+# STEP 9 — Load test/anomaly images for evaluation
+# ============================================================
+def create_batches(folder, batch_size=3, img_size=(128, 128)):
+    images = []
+    for file in os.listdir(folder):
+        path = os.path.join(folder, file)
+        img = cv2.imread(path)
+        if img is None:
+            continue
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)   # keep channel order consistent w/ training
+        img = cv2.resize(img, img_size)
+        img = img / 255.0
+        images.append(img)
+ 
+    images = np.array(images)
+    batches = [images[i:i + batch_size] for i in range(0, len(images), batch_size)]
+    return batches
+ 
+ 
+test_batches = create_batches(Thermal_path_2)
+
+
+ 
+# ============================================================
+# STEP 10 — Reconstruct and generate anomaly heatmaps
+# ============================================================
+reconstructed = vae(test_batches[0])
+orig = test_batches[0]
+recon = reconstructed.numpy()
+ 
+n_show = min(3, len(orig))
+plt.figure(figsize=(12, 6))
+ 
+for i in range(n_show):
+    plt.subplot(3, n_show, i + 1)
+    plt.imshow(orig[i])
+    plt.title("Original")
+    plt.axis('off')
+ 
+    plt.subplot(3, n_show, i + 1 + n_show)
+    plt.imshow(recon[i])
+    plt.title("Reconstructed")
+    plt.axis('off')
+ 
+    error = np.abs(orig[i] - recon[i])
+    error_map = error.mean(axis=-1)   # collapse RGB channels into a single heatmap
+    plt.subplot(3, n_show, i + 1 + 2 * n_show)
+    plt.imshow(error_map, cmap='hot')
+    plt.title("Anomaly Heatmap")
+    plt.axis('off')
+ 
+plt.tight_layout()
+plt.show()

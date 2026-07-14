@@ -1,0 +1,28 @@
+from fastai.vision.all import * 
+import fastai 
+from fastai import * 
+path = untar_data(URLs.PETS, force_download=True) 
+
+Path
+
+fnames=get_image_files(path/"images") 
+fnames[0:10]
+
+pat=r'^(.*)_\d+.jpg' 
+batch = ImageDataLoaders.from_name_re(path, fnames, pat, item_tfms=Resize(64)) 
+batch 
+
+x, y = batch.one_batch() 
+x.shape 
+
+y.shape
+
+batch.show_batch()
+
+model = vision_learner(batch, models.resnet18, metrics=[accuracy], 
+model_dir=path/"images")
+model.fit(5)
+
+p = ClassificationInterpretation.from_learner(model) 
+p.print_classification_report() 
+p.plot_confusion_matrix(figsize=(10,10)) 

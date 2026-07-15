@@ -1,0 +1,27 @@
+import numpy as np 
+from sympy import symbols, Matrix 
+
+def matrix_ops(A, B):
+    print("A:\n", A, "\nB:\n", B)
+    print("\nA + B:\n", A + B)
+    print("\nA - B:\n", A - B)
+    print("\nA * B (element-wise):\n", A * B)
+    print("\nA @ B (matrix multiplication):\n", A @ B)
+    print("\nInverse of A:\n", np.linalg.inv(A) if np.linalg.det(A) else "Not invertible")
+
+
+print("Matrix Operations\n") 
+A, B = np.array([[1, 2], [3, 4]]), np.array([[5, 6], [7, 8]]) 
+matrix_ops(A, B)
+
+x, y = symbols('x y')
+
+v = Matrix([x**2, y**3]) 
+M = Matrix([[x**2, x*y], [y**2, x + y]]) 
+
+print("\nVector differentiation:\ndv/dx:\n", v.diff(x), "\ndv/dy:\n", 
+v.diff(y)) 
+
+print("\nMatrix differentiation:\ndM/dx:\n", M.diff(x), "\ndM/dy:\n", 
+M.diff(y)) 
+

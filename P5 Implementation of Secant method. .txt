@@ -1,0 +1,27 @@
+def secant_method(f, x0, x1, tol=1e-6, max_iter=100):
+    for i in range(max_iter):
+        if f(x1) - f(x0) == 0:
+            print("Zero denominator. Secant method fails.")
+            return None
+
+        x2 = x1 - f(x1) * (x1 - x0) / (f(x1) - f(x0))
+        print(f"Iteration {i+1}: x = {x2}, f(x) = {f(x2)}")
+
+        if abs(x2 - x1) < tol:
+            print("Converged!")
+            return x2
+
+        x0, x1 = x1, x2
+
+    print("Maximum iterations reached. Method did not converge.")
+    return None
+
+# Example usage
+if __name__ == "__main__":
+    import math
+
+    def func(x):
+        return x**3 - x - 2 # Root near x ≈ 1.521
+
+    root = secant_method(func, 1.0, 2.0)
+    print(f"Approximated Root: {root}")

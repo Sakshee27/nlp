@@ -1,0 +1,18 @@
+from scipy.optimize import minimize 
+ 
+ 
+# Objective function 
+f = lambda x: (x[0] - 1)**2 + (x[1] + 2)**2 
+ 
+ 
+# Initial guess 
+x0 = [0, 0] 
+ 
+# BFGS optimization 
+res = minimize(f, x0, method='BFGS') 
+ 
+ 
+# Results 
+print("Optimal x:", res.x) 
+print("Minimum value:", res.fun) 
+print("Success:", res.success)

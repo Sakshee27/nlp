@@ -1,0 +1,19 @@
+from pyswarm import pso 
+ 
+ 
+# Objective function 
+f = lambda x: (x[0] - 1)**2 + (x[1] + 2)**2 
+ 
+ 
+# Bounds for variables 
+lb = [-10, -10] 
+ub = [10, 10] 
+ 
+ 
+# Run PSO 
+xopt, fopt = pso(f, lb, ub) 
+ 
+ 
+# Results 
+print("Optimal x:", xopt) 
+print("Minimum value:", fopt)

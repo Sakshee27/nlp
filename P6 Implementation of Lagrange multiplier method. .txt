@@ -1,0 +1,29 @@
+from sympy import symbols, diff, Eq, solve
+
+
+# Define variables
+x, y, lam = symbols('x y lambda')
+
+
+# Objective and constraint
+f = x + y
+g = x**2 + y**2 - 1
+
+
+# Lagrangian
+L = f - lam * g
+
+# Compute gradients
+grad_x = diff(L, x)
+grad_y = diff(L, y)
+grad_lam = diff(L, lam)
+# Solve the system of equations
+solutions = solve([grad_x, grad_y, grad_lam], (x, y, lam), dict=True)
+
+
+# Display results
+for sol in solutions:
+    x_val = sol[x].evalf()
+    y_val = sol[y].evalf()
+    f_val = f.subs({x: x_val, y: y_val}).evalf()
+    print(f"Optimal Point: x = {x_val}, y = {y_val}, f(x, y) = {f_val}")

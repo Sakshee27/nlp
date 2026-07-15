@@ -1,0 +1,57 @@
+import numpy as np
+
+
+def simplex(c, A, b):
+    """Simplified simplex method for maximization problems"""
+    m, n = A.shape
+    # Add slack variables
+    A = np.hstack([A, np.eye(m)])
+    c = np.hstack([c, np.zeros(m)])
+    basis = list(range(n, n+m))
+
+    while True:
+        B = A[:, basis]
+        try:
+            B_inv = np.linalg.inv(B)
+        except:
+            return "No solution"
+        # Current solution
+        x = np.zeros(n+m)
+        x[basis] = B_inv @ b
+
+
+        # Check optimality
+        reduced_costs = c - c[basis] @ B_inv @ A
+        if np.all(reduced_costs <= 0):
+            return {"value": c @ x, "primal": x[:n], "dual": c[basis] @ \
+B_inv}
+
+
+        # Pivot
+        entering = np.argmax(reduced_costs)
+        direction = B_inv @ A[:, entering]
+        if np.all(direction <= 0):
+            return "Unbounded"
+
+        ratios = np.where(direction > 0, x[basis]/direction, np.inf)
+        leaving = np.argmin(ratios)
+        basis[leaving] = entering
+# Example usage
+c = np.array([3, 4]) # Maximize 3x1 + 4x2
+A = np.array([[1, 2],  # x1 + 2x2 ≤ 10
+              [1, 1]]) # x1 + x2 ≤ 8
+b = np.array([10, 8])
+
+
+result = simplex(c, A, b)
+print("Primal solution:", result["primal"])
+print("Optimal value:", result["value"])
+print("Dual solution (shadow prices):", result["dual"])
+
+
+# Dual problem solution (should match primal optimal value)
+dual_c = -b
+dual_A = -A.T
+dual_b = -c
+dual_result = simplex(dual_c, dual_A, dual_b)
+print("\nDual optimal value:", -dual_result["value"])

@@ -1,0 +1,36 @@
+import numpy as np
+
+
+# Objective function
+def f(x): return (x[0] - 1)**2 + (x[1] + 2)**2
+
+
+n = 20 # number of flowers
+d = 2 # dimensions
+p = 0.8 # switch probability
+iter_max = 100
+lb, ub = -10, 10
+
+
+flowers = np.random.uniform(lb, ub, (n, d))
+fitness = np.array([f(x) for x in flowers])
+best = flowers[np.argmin(fitness)]
+
+for t in range(iter_max):
+    for i in range(n):
+        if np.random.rand() < p:
+            L = np.random.normal(0, 1, d)
+            x_new = flowers[i] + L * (flowers[i] - best)
+        else:
+            j, k = np.random.randint(n, size=2)
+            x_new = flowers[i] + np.random.rand() * (flowers[j] -
+                                                  flowers[k])
+        x_new = np.clip(x_new, lb, ub)
+        if f(x_new) < f(flowers[i]):
+            flowers[i] = x_new
+        if f(x_new) < f(best):
+            best = x_new
+
+
+print("Optimal x:", best)
+print("Minimum value:", f(best))
